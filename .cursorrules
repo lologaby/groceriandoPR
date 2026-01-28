@@ -1,0 +1,956 @@
+# Shopping List App - Puerto Rico Supermercados + Notion
+
+## Propósito de la App
+
+Esta app sirve como:
+1. **Base de conocimiento**: Saber qué supermercados traen qué marcas en Puerto Rico
+2. **Comparador de precios**: Ver precios de TODOS los supermercados aunque no estén en tu área
+3. **Lista de compras inteligente**: Agregar a Notion con recomendaciones y alternativas
+4. **Descubrimiento de productos**: Encontrar alternativas más baratas o disponibles cerca
+
+**Ejemplo de uso real**:
+- Usuario busca "Jamón Hormel"
+- App muestra que está en SuperMax (Bayamón $8.49), Walmart (Carolina $8.99), Costco (San Juan $45.99 pack de 6)
+- Aunque el usuario está en Bayamón, VE que Costco lo trae (útil si va a San Juan)
+- App sugiere: "¿Quieres ver jamones similares más baratos?" y muestra alternativas
+
+## Stack Tecnológico
+
+### Frontend
+- React 18+ con TypeScript
+- Vite como bundler
+- Tailwind CSS para estilos
+- React Query para data fetching y caching
+- Zustand para estado global
+- React Router para navegación
+- React Hot Toast para notificaciones
+
+### Backend
+- Node.js 18+ con Express
+- TypeScript en modo strict
+- Puppeteer para web scraping
+- Redis para caching (Upstash o local)
+- Bull para job queues
+
+### Bases de Datos
+- Product Database API: UPCitemdb o Barcode Lookup
+- Notion API para listas de compras
+- MongoDB/PostgreSQL local para:
+  - Cache de productos
+  - Historial de precios
+  - Mapping de productos a marcas alternativas
+
+### DevOps
+- Docker para desarrollo local
+- Environment variables con dotenv
+- ESLint + Prettier
+- Husky para pre-commit hooks
+
+## Supermercados a Incluir
+
+### Tier 1: Con e-commerce funcional (scraping activo)
+- SuperMax (supermaxonline.com)
+- Econo (econotogo.com - por tienda)
+- Walmart (walmart.com con geolocalización PR)
+- Selectos (selectoseasyshop.com)
+- **Costco** (costco.com - importante para compras al por mayor)
+- **Sam's Club** (samsclub.com - compras al por mayor)
+
+### Tier 2: Sin e-commerce (mostrar como referencia)
+- Pueblo (pueblosupermarkets.com - sin tienda online)
+- Amigo (amigo.com - parte de Pueblo, sin tienda online)
+- Agranel (agranelpr.com)
+- Ralph's Food Warehouse (ralphspr.com)
+- Mr. Special
+- Freshmart
+- Grande
+
+### Tier 3: Especializados (agregar en fase 2)
+- Restaurants Depot (para chefs/negocios)
+- PriceSmart (membresía)
+- BJ's Wholesale Club
+
+## Arquitectura de la App
+
+### Flujo Principal
+
+```
+1. BÚSQUEDA INICIAL
+   Usuario: "Jamón Hormel"
+   ↓
+   Backend: Consulta Product Database API (UPCitemdb)
+   ↓
+   Frontend: Muestra productos SIEMPRE (con foto, marca, UPC)
+   - Jamón Hormel Original 8oz
+   - Jamón Hormel Black Label 16oz
+   - Jamón Hormel Natural Choice 6oz
+
+2. USUARIO SELECCIONA PRODUCTO
+   Usuario: Toca "Jamón Hormel Original 8oz"
+   ↓
+   Backend: Scraping en TODOS los supermercados (Tier 1 + Tier 2)
+   ↓
+   Frontend: Muestra resultados en tiempo real (streaming)
+   
+3. VISTA DE COMPARACIÓN COMPLETA
+   SuperMax (Bayamón): $8.49 ✅ En stock
+   Walmart (Carolina): $8.99 ✅ En stock
+   Costco (San Juan): $45.99 ✅ Pack de 6 unidades
+   Econo (Guaynabo): $9.25 ✅ En stock
+   Selectos (Caguas): $8.75 ✅ En stock
+   ---
+   Pueblo: ⚠️ Sin tienda online - Verificar en tienda
+   Amigo: ⚠️ Sin tienda online - Verificar en tienda
+   Sam's Club (Bayamón): $52.99 ✅ Pack de 8 unidades
+
+4. RECOMENDACIONES INTELIGENTES
+   💡 El mejor precio unitario es en Costco ($7.67/unidad)
+   💡 Si compras 1 unidad, mejor en SuperMax ($8.49)
+   💡 Alternativas más baratas:
+      - Jamón Oscar Mayer en Walmart: $6.99
+      - Jamón Private Selection en SuperMax: $7.29
+
+5. USUARIO AGREGA A NOTION
+   Usuario: Escoge SuperMax
+   ↓
+   Backend: Crea entrada en Notion con:
+   - Producto, marca, cantidad
+   - Tienda seleccionada y ubicación
+   - TODOS los precios de todas las tiendas
+   - Alternativas sugeridas
+   - Mejor precio unitario
+   ↓
+   Frontend: "✅ Agregado a tu lista en Notion!"
+```
+
+### Características Smart
+
+#### 1. Alternativas Inteligentes
+```typescript
+// La app debe sugerir automáticamente:
+- Marcas similares más baratas
+- Versiones genéricas/store brand
+- Tamaños diferentes con mejor precio unitario
+- Packs al por mayor si ahorran dinero
+
+Ejemplo:
+"¿Buscas Jamón Hormel? Alternativas más baratas:
+ • Jamón Kirkland (Costco) - $6.99
+ • Jamón Great Value (Walmart) - $6.49
+ • Jamón SuperMax Brand - $5.99"
+```
+
+#### 2. Base de Conocimiento
+```typescript
+// Guardar histórico de:
+- Qué tiendas traen qué marcas (aunque no tengas e-commerce)
+- Precios históricos (gráficas de tendencias)
+- Disponibilidad por ubicación
+- Temporadas de ofertas
+
+Ejemplo:
+"Jamón Hormel Original 8oz:
+ Disponible en 6 de 10 supermercados
+ Precio promedio: $8.75
+ Tendencia: ↗️ Subió $0.30 en el último mes
+ Mejor época para comprar: Black Friday (históricamente $6.99)"
+```
+
+#### 3. Búsqueda por Ubicación Inteligente
+```typescript
+// Usuario en Bayamón busca leche
+App muestra:
+1. SuperMax (Bayamón) - A 2 km
+2. Walmart (Bayamón) - A 3 km
+3. Econo (Guaynabo) - A 5 km
+...pero también...
+10. Costco (San Juan) - A 15 km ⚠️ Requiere membresía, pero mejor precio
+
+Opción: "Mostrar solo tiendas cerca de mí" vs "Mostrar todas"
+```
+
+#### 4. Smart Shopping List Optimization
+```typescript
+// Después de agregar varios productos, la app sugiere:
+"Tu lista tiene 15 productos. Aquí está la ruta óptima:
+
+Opción A (Ahorro máximo): $182.45 total
+ 1. Compra 8 items en Costco (San Juan)
+ 2. Compra 5 items en SuperMax (Bayamón)
+ 3. Compra 2 items en Walmart (Carolina)
+ Ahorras: $24.50 | Requiere: 3 paradas
+
+Opción B (Conveniencia): $198.99 total
+ 1. Compra 12 items en Walmart (Bayamón)
+ 2. Compra 3 items en SuperMax (Bayamón)
+ Gastas extra: $16.54 | Requiere: 2 paradas cerca
+
+Opción C (Todo en un lugar): $206.95 total
+ 1. Compra 15 items en Walmart (Bayamón)
+ Gastas extra: $24.50 | Requiere: 1 parada"
+```
+
+#### 5. Marcas que Solo Venden Ciertas Tiendas
+```typescript
+// Base de conocimiento de marcas exclusivas
+"Kirkland Signature → Solo en Costco
+Member's Mark → Solo en Sam's Club
+Great Value → Solo en Walmart
+SuperMax Brand → Solo en SuperMax
+Econo Gold → Solo en Econo"
+
+// La app muestra esto cuando buscas
+"Buscando aceite de oliva Kirkland?
+ℹ️ Esta marca es exclusiva de Costco
+📍 Costco más cercano: San Juan (15 km)
+💡 Alternativa en Bayamón: Aceite Goya en SuperMax ($12.99)"
+```
+
+#### 6. Comparación de Packs vs Unidades
+```typescript
+// Smart unit pricing
+"Jamón Hormel:
+ SuperMax: $8.49 (8oz) = $1.06/oz
+ Costco: $45.99 (6 pack de 8oz = 48oz) = $0.96/oz ✅ Mejor precio/oz
+ Sam's Club: $52.99 (8 pack de 8oz = 64oz) = $0.83/oz ✅✅ MEJOR
+ 
+💡 Si compras más de 6 unidades al mes, te conviene Sam's Club"
+```
+
+#### 7. Alertas y Notificaciones (Fase 2)
+```typescript
+// Usuario puede activar alertas:
+"Avisarme cuando Jamón Hormel baje de $8.00"
+"Avisarme cuando esté en oferta en SuperMax"
+"Avisarme si aparece en un supermercado nuevo"
+```
+
+## Reglas de Código
+
+### TypeScript
+```typescript
+// SIEMPRE usar strict mode
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true
+  }
+}
+
+// Todos los tipos deben estar definidos explícitamente
+// ❌ MAL
+const products = [];
+
+// ✅ BIEN
+const products: Product[] = [];
+
+// ❌ MAL
+function search(query) { }
+
+// ✅ BIEN
+function search(query: string): Promise<Product[]> { }
+```
+
+### Naming Conventions
+```typescript
+// Components: PascalCase
+ProductSearch.tsx
+StoreComparison.tsx
+
+// Services: PascalCase con Service suffix
+ProductDatabaseService.ts
+SupermarketScraperService.ts
+
+// Utils: camelCase
+parsePrice.ts
+formatCurrency.ts
+
+// Hooks: camelCase con use prefix
+useProductSearch.ts
+useStoreComparison.ts
+
+// Types/Interfaces: PascalCase
+Product.ts
+StoreResult.ts
+
+// Constants: UPPER_SNAKE_CASE
+const MAX_RETRY_ATTEMPTS = 3;
+const CACHE_TTL_HOURS = 2;
+```
+
+### File Structure
+```
+src/
+├── components/
+│   ├── ProductSearch/
+│   │   ├── ProductSearch.tsx
+│   │   ├── ProductSearch.test.tsx
+│   │   ├── ProductCard.tsx
+│   │   └── index.ts
+│   ├── StoreComparison/
+│   │   ├── StoreComparison.tsx
+│   │   ├── StoreCard.tsx
+│   │   ├── AlternativeSuggestions.tsx
+│   │   └── index.ts
+│   └── NotionIntegration/
+│       ├── AddToNotionModal.tsx
+│       ├── NotionSettings.tsx
+│       └── index.ts
+├── services/
+│   ├── ProductDatabaseService.ts
+│   ├── scrapers/
+│   │   ├── BaseScraper.ts
+│   │   ├── SuperMaxScraper.ts
+│   │   ├── EconoScraper.ts
+│   │   ├── WalmartScraper.ts
+│   │   ├── CostcoScraper.ts
+│   │   └── SamsClubScraper.ts
+│   ├── NotionService.ts
+│   ├── CacheService.ts
+│   └── SmartRecommendationService.ts
+├── hooks/
+│   ├── useProductSearch.ts
+│   ├── useStoreComparison.ts
+│   └── useNotionIntegration.ts
+├── utils/
+│   ├── parsePrice.ts
+│   ├── formatCurrency.ts
+│   ├── calculateUnitPrice.ts
+│   ├── findBestDeal.ts
+│   └── fuzzyMatch.ts
+├── types/
+│   ├── Product.ts
+│   ├── Store.ts
+│   ├── StoreResult.ts
+│   └── NotionEntry.ts
+└── constants/
+    ├── stores.ts
+    ├── api.ts
+    └── cache.ts
+```
+
+### Error Handling
+```typescript
+// SIEMPRE manejar errores explícitamente
+// ❌ MAL
+const products = await searchProducts(query);
+
+// ✅ BIEN
+try {
+  const products = await searchProducts(query);
+  return { data: products, error: null };
+} catch (error) {
+  console.error('Error searching products:', error);
+  return { 
+    data: null, 
+    error: error instanceof Error ? error.message : 'Unknown error' 
+  };
+}
+
+// Para servicios, usar Result type
+type Result<T> = 
+  | { success: true; data: T }
+  | { success: false; error: string };
+
+async function searchProducts(query: string): Promise<Result<Product[]>> {
+  try {
+    const data = await fetch(`/api/products?q=${query}`);
+    return { success: true, data };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
+}
+```
+
+### React Components
+```typescript
+// SIEMPRE usar functional components con TypeScript
+// ❌ MAL
+function ProductCard(props) {
+  return <div>{props.name}</div>;
+}
+
+// ✅ BIEN
+interface ProductCardProps {
+  product: Product;
+  onSelect: (product: Product) => void;
+  showPrice?: boolean;
+}
+
+const ProductCard: React.FC<ProductCardProps> = ({ 
+  product, 
+  onSelect,
+  showPrice = true 
+}) => {
+  return (
+    <div onClick={() => onSelect(product)}>
+      <h3>{product.name}</h3>
+      {showPrice && <p>${product.price}</p>}
+    </div>
+  );
+};
+
+export default ProductCard;
+```
+
+### API Design
+```typescript
+// RESTful endpoints con tipos claros
+
+// GET /api/products/search
+interface ProductSearchRequest {
+  q: string;
+  category?: string;
+  limit?: number;
+}
+
+interface ProductSearchResponse {
+  products: Product[];
+  total: number;
+  cached: boolean;
+}
+
+// POST /api/products/check-stores
+interface CheckStoresRequest {
+  productName: string;
+  upc: string;
+  userLocation: string;
+  showAllStores?: boolean; // true = mostrar todo PR, false = solo cerca
+}
+
+interface CheckStoresResponse {
+  results: StoreResult[];
+  recommendations: Recommendation[];
+  alternatives: Alternative[];
+  bestDeal: {
+    store: string;
+    price: number;
+    unitPrice: number;
+  };
+}
+
+// POST /api/notion/add-item
+interface AddToNotionRequest {
+  notionApiKey: string;
+  databaseId: string;
+  productData: {
+    productName: string;
+    brand: string;
+    upc: string;
+    quantity: number;
+    selectedStore: string;
+    selectedLocation: string;
+    price: number;
+    allPrices: Record<string, number | null>;
+    alternatives: Alternative[];
+    recommendations: string[];
+  };
+}
+```
+
+### Caching Strategy
+```typescript
+// Usar Redis con TTLs apropiados
+
+// Product database search: 24 horas (productos no cambian)
+await redis.setex(`product:search:${query}`, 86400, JSON.stringify(products));
+
+// Store scraping: 2 horas (precios pueden cambiar)
+await redis.setex(`store:${upc}:${store}:${location}`, 7200, JSON.stringify(result));
+
+// User preferences: 7 días
+await redis.setex(`user:${userId}:prefs`, 604800, JSON.stringify(prefs));
+
+// Historical prices: No expiration (usar database)
+await db.prices.insert({ product, store, price, date: new Date() });
+```
+
+### Web Scraping Best Practices
+```typescript
+// Base Scraper que todos heredan
+abstract class BaseScraper {
+  protected browser?: Browser;
+  protected maxRetries = 3;
+  protected timeout = 15000;
+  
+  abstract searchProduct(
+    productName: string, 
+    location?: string
+  ): Promise<StoreResult[]>;
+  
+  protected async initBrowser(): Promise<void> {
+    this.browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+  }
+  
+  protected async closeBrowser(): Promise<void> {
+    if (this.browser) {
+      await this.browser.close();
+    }
+  }
+  
+  protected parsePrice(priceText: string): number {
+    // Limpiar texto: "$8.99" -> 8.99
+    const cleaned = priceText.replace(/[^0-9.]/g, '');
+    const price = parseFloat(cleaned);
+    return isNaN(price) ? 0 : price;
+  }
+  
+  protected async retryOnFail<T>(
+    fn: () => Promise<T>,
+    retries = this.maxRetries
+  ): Promise<T> {
+    try {
+      return await fn();
+    } catch (error) {
+      if (retries > 0) {
+        await this.delay(1000);
+        return this.retryOnFail(fn, retries - 1);
+      }
+      throw error;
+    }
+  }
+  
+  protected delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+// Ejemplo de implementación
+class SuperMaxScraper extends BaseScraper {
+  async searchProduct(productName: string): Promise<StoreResult[]> {
+    await this.initBrowser();
+    
+    try {
+      const page = await this.browser!.newPage();
+      
+      // User agent real
+      await page.setUserAgent(
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      );
+      
+      // Ir al sitio
+      await page.goto('https://www.supermaxonline.com', {
+        waitUntil: 'networkidle2',
+        timeout: this.timeout
+      });
+      
+      // Buscar producto
+      await page.type('.search-input', productName);
+      await page.click('.search-button');
+      
+      // Esperar resultados
+      await page.waitForSelector('.product-item', { 
+        timeout: this.timeout 
+      });
+      
+      // Extraer data
+      const products = await page.evaluate(() => {
+        // ... código de extracción
+      });
+      
+      return this.normalizeResults(products);
+      
+    } finally {
+      await this.closeBrowser();
+    }
+  }
+  
+  private normalizeResults(raw: any[]): StoreResult[] {
+    return raw.map(p => ({
+      storeName: 'SuperMax',
+      productName: p.name,
+      price: this.parsePrice(p.price),
+      available: p.available,
+      url: p.url,
+      location: 'Multiple locations',
+      lastUpdated: new Date(),
+      status: 'found'
+    }));
+  }
+}
+```
+
+### Smart Recommendations Service
+```typescript
+// Servicio que genera recomendaciones inteligentes
+class SmartRecommendationService {
+  async getRecommendations(
+    product: Product,
+    storeResults: StoreResult[],
+    userLocation: string
+  ): Promise<Recommendation[]> {
+    const recommendations: Recommendation[] = [];
+    
+    // 1. Mejor precio unitario
+    const unitPrices = this.calculateUnitPrices(storeResults);
+    const bestUnitPrice = this.findBestUnitPrice(unitPrices);
+    recommendations.push({
+      type: 'best_unit_price',
+      message: `Mejor precio por unidad: ${bestUnitPrice.store} ($${bestUnitPrice.pricePerUnit}/oz)`,
+      savings: this.calculateSavings(bestUnitPrice, unitPrices)
+    });
+    
+    // 2. Mejor precio para 1 unidad
+    const bestSinglePrice = this.findBestSinglePrice(storeResults);
+    if (bestSinglePrice) {
+      recommendations.push({
+        type: 'best_single_price',
+        message: `Para 1 unidad: ${bestSinglePrice.store} ($${bestSinglePrice.price})`,
+        store: bestSinglePrice.store
+      });
+    }
+    
+    // 3. Alternativas más baratas
+    const alternatives = await this.findAlternatives(product, storeResults);
+    if (alternatives.length > 0) {
+      recommendations.push({
+        type: 'alternatives',
+        message: 'Alternativas más baratas disponibles',
+        alternatives: alternatives.slice(0, 3)
+      });
+    }
+    
+    // 4. Tiendas cerca del usuario
+    const nearbyStores = this.filterByLocation(storeResults, userLocation);
+    if (nearbyStores.length > 0) {
+      recommendations.push({
+        type: 'nearby',
+        message: `${nearbyStores.length} opciones cerca de ${userLocation}`,
+        stores: nearbyStores
+      });
+    }
+    
+    // 5. Ofertas especiales
+    const onSale = storeResults.filter(r => r.onSale);
+    if (onSale.length > 0) {
+      recommendations.push({
+        type: 'sale',
+        message: `🔥 En oferta en ${onSale.length} tiendas`,
+        stores: onSale
+      });
+    }
+    
+    return recommendations;
+  }
+  
+  private calculateUnitPrices(results: StoreResult[]): UnitPrice[] {
+    return results.map(result => ({
+      store: result.storeName,
+      price: result.price,
+      size: this.extractSize(result.productName), // ej: "8oz"
+      pricePerUnit: this.calculatePricePerOz(result.price, result.productName)
+    }));
+  }
+  
+  private async findAlternatives(
+    product: Product,
+    storeResults: StoreResult[]
+  ): Promise<Alternative[]> {
+    // Buscar productos similares más baratos
+    const category = product.category;
+    const maxPrice = Math.min(...storeResults.map(r => r.price));
+    
+    const alternatives = await db.products.find({
+      category,
+      averagePrice: { $lt: maxPrice },
+      brand: { $ne: product.brand } // Marca diferente
+    }).limit(5);
+    
+    return alternatives;
+  }
+}
+```
+
+### UI/UX Guidelines
+
+```typescript
+// Loading states SIEMPRE visibles
+const StoreComparison = ({ product }) => {
+  const { data, isLoading, error } = useStoreComparison(product);
+  
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Spinner />
+          <p>Buscando en supermercados de Puerto Rico...</p>
+        </div>
+        
+        {/* Mostrar progreso por tienda */}
+        <div className="space-y-2">
+          <StoreLoadingIndicator store="SuperMax" status="checking" />
+          <StoreLoadingIndicator store="Econo" status="found" />
+          <StoreLoadingIndicator store="Walmart" status="checking" />
+          <StoreLoadingIndicator store="Costco" status="pending" />
+        </div>
+      </div>
+    );
+  }
+  
+  // ... resto del componente
+};
+
+// Errores con fallback útil
+if (error) {
+  return (
+    <ErrorState
+      title="No pudimos buscar en algunos supermercados"
+      message="Pero aquí están los resultados que encontramos:"
+      action={<Button onClick={retry}>Reintentar</Button>}
+    >
+      {/* Mostrar resultados parciales aunque haya error */}
+      {partialResults.map(result => (
+        <StoreCard key={result.store} result={result} />
+      ))}
+    </ErrorState>
+  );
+}
+```
+
+### Testing
+```typescript
+// SIEMPRE escribir tests para:
+// 1. Parsers de precios
+describe('parsePrice', () => {
+  it('should parse price with dollar sign', () => {
+    expect(parsePrice('$8.99')).toBe(8.99);
+  });
+  
+  it('should parse price with comma', () => {
+    expect(parsePrice('$1,299.99')).toBe(1299.99);
+  });
+  
+  it('should handle invalid input', () => {
+    expect(parsePrice('N/A')).toBe(0);
+  });
+});
+
+// 2. Unit price calculations
+describe('calculateUnitPrice', () => {
+  it('should calculate price per oz correctly', () => {
+    const result = calculateUnitPrice(8.99, '8oz');
+    expect(result).toBeCloseTo(1.124, 2);
+  });
+});
+
+// 3. Scrapers (mock Puppeteer)
+describe('SuperMaxScraper', () => {
+  it('should extract product information correctly', async () => {
+    const scraper = new SuperMaxScraper();
+    const results = await scraper.searchProduct('Jamón Hormel');
+    
+    expect(results).toHaveLength(greaterThan(0));
+    expect(results[0]).toHaveProperty('productName');
+    expect(results[0]).toHaveProperty('price');
+    expect(results[0].price).toBeGreaterThan(0);
+  });
+});
+```
+
+## Environment Variables
+
+```bash
+# .env.example
+
+# Backend
+NODE_ENV=development
+PORT=3001
+
+# Product Database API
+UPCITEMDB_API_KEY=your_key_here
+BARCODE_LOOKUP_API_KEY=your_key_here
+
+# Redis
+REDIS_URL=redis://localhost:6379
+# O usar Upstash para producción
+UPSTASH_REDIS_URL=your_upstash_url
+UPSTASH_REDIS_TOKEN=your_upstash_token
+
+# MongoDB/PostgreSQL
+DATABASE_URL=mongodb://localhost:27017/shopping-app
+# O
+DATABASE_URL=postgresql://user:pass@localhost:5432/shopping-app
+
+# Notion (usuario configura en UI)
+# NOTION_API_KEY=user_provided
+# NOTION_DATABASE_ID=user_provided
+
+# Scraping
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+MAX_CONCURRENT_SCRAPERS=4
+SCRAPER_TIMEOUT_MS=15000
+
+# Caching
+CACHE_TTL_PRODUCTS=86400  # 24 horas
+CACHE_TTL_STORES=7200     # 2 horas
+CACHE_TTL_PRICES=3600     # 1 hora
+
+# Features
+ENABLE_PRICE_HISTORY=true
+ENABLE_SMART_RECOMMENDATIONS=true
+ENABLE_LOCATION_SERVICES=true
+```
+
+## API Rate Limits
+
+```typescript
+// Implementar rate limiting para proteger scrapers
+import rateLimit from 'express-rate-limit';
+
+// Rate limit general
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100 // 100 requests por ventana
+});
+
+// Rate limit específico para scraping
+const scrapingLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: 5, // Máximo 5 búsquedas por minuto
+  message: 'Demasiadas búsquedas. Por favor espera un momento.'
+});
+
+app.use('/api/', limiter);
+app.use('/api/products/check-stores', scrapingLimiter);
+```
+
+## Deployment
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:3001
+    depends_on:
+      - backend
+  
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=mongodb://mongo:27017/shopping-app
+    depends_on:
+      - redis
+      - mongo
+  
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+  
+  mongo:
+    image: mongo:6
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  redis-data:
+  mongo-data:
+```
+
+## Consideraciones Importantes
+
+### 1. Costco y Sam's Club
+- Requieren membresía
+- Mostrar badge: "🔐 Requiere membresía"
+- Precios son al por mayor (packs)
+- Calcular precio unitario para comparar fairly
+
+### 2. Supermercados sin E-commerce
+- NO hacer scraping (no tienen tienda online)
+- Mostrar: "⚠️ Sin compras online - Verificar en tienda"
+- Aún así agregarlos a la base de conocimiento manual
+- Permitir a usuarios reportar si lo vieron en tienda
+
+### 3. Ubicaciones
+- Guardar preferencia del usuario
+- Permitir cambiar ubicación temporalmente
+- Mostrar distancia aproximada a cada tienda
+- Opción: "Mostrar solo cerca de mí" vs "Mostrar todo PR"
+
+### 4. Precios Históricos
+- Guardar cada scraping en base de datos
+- Mostrar gráfica de tendencia
+- Alertas cuando precio baja
+- Predicción de mejor época para comprar
+
+### 5. Community Features (Fase 3)
+- Usuarios pueden reportar precios vistos en tienda
+- Reportar productos nuevos
+- Validación cruzada con otros usuarios
+- Sistema de reputación
+
+### 6. Legal
+- Respetar robots.txt
+- Rate limiting agresivo
+- User-Agent honesto
+- No revender datos
+- Terms of Service claros
+
+## Prioridades de Desarrollo
+
+### Sprint 1 (Semana 1-2): MVP Core
+- [ ] Setup proyecto (Frontend + Backend)
+- [ ] Integración Product Database API
+- [ ] Componente de búsqueda básico
+- [ ] Scraper de SuperMax (el más importante)
+- [ ] Scraper de Walmart
+- [ ] Vista de comparación básica
+- [ ] Integración Notion básica
+
+### Sprint 2 (Semana 3-4): Scrapers + Smart Features
+- [ ] Scraper de Econo
+- [ ] Scraper de Selectos
+- [ ] Scraper de Costco
+- [ ] Scraper de Sam's Club
+- [ ] Servicio de recomendaciones inteligentes
+- [ ] Sugerencias de alternativas
+- [ ] Cálculo de precio unitario
+
+### Sprint 3 (Semana 5-6): Polish + UX
+- [ ] Sistema de caching robusto
+- [ ] Búsqueda por ubicación
+- [ ] Optimización de ruta de compra
+- [ ] Historial de precios
+- [ ] UI/UX mejorada
+- [ ] Loading states polish
+- [ ] Error handling robusto
+
+### Sprint 4 (Semana 7-8): Advanced Features
+- [ ] Base de conocimiento de marcas exclusivas
+- [ ] Sistema de alertas de precios
+- [ ] Gráficas de tendencias
+- [ ] Export de lista a PDF
+- [ ] Compartir listas
+- [ ] PWA (app instalable)
+
+## Notas Finales
+
+- **Comentarios en español**: Todo el código debe tener comentarios en español
+- **Responsive first**: Mobile-first design con Tailwind
+- **Accessibility**: ARIA labels, keyboard navigation
+- **Performance**: Code splitting, lazy loading, optimistic UI
+- **SEO**: Meta tags, Open Graph, structured data
+- **Analytics**: Track búsquedas populares, productos más buscados
+
+Esta app es una herramienta de referencia tanto como una lista de compras. El valor está en ayudar a la gente a descubrir dónde conseguir productos, comparar precios inteligentemente, y tomar decisiones informadas sobre dónde comprar.

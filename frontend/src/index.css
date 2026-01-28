@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+  }
+  
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+  }
+  
+  * {
+    @apply border-neutral-200 dark:border-neutral-800;
+  }
+  
+  body {
+    @apply bg-gradient-to-br from-neutral-50 to-neutral-100 dark:from-neutral-950 dark:to-neutral-900;
+    @apply text-neutral-900 dark:text-neutral-100;
+    @apply font-sans antialiased;
+    @apply min-h-screen;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Glassmorphism effect */
+  .glass {
+    @apply bg-white/80 dark:bg-neutral-900/80;
+    @apply backdrop-blur-xl;
+    @apply border border-neutral-200/50 dark:border-neutral-800/50;
+  }
+  
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary-600 to-primary-400;
+    @apply bg-clip-text text-transparent;
+  }
+  
+  /* Shimmer loading effect */
+  .shimmer {
+    @apply bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200;
+    @apply dark:from-neutral-800 dark:via-neutral-700 dark:to-neutral-800;
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
+}

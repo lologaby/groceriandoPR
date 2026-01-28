@@ -1,0 +1,25 @@
+{
+  "name": "groceriando",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lista de compras inteligente con Notion - Puerto Rico",
+  "workspaces": ["frontend", "backend"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "npm run dev -w frontend",
+    "dev:backend": "npm run dev -w backend",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "start": "npm run start -w backend",
+    "lint": "eslint backend/src frontend/src",
+    "format": "prettier --write \"backend/src/**/*.ts\" \"frontend/src/**/*.{ts,tsx}\""
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.34.0",
+    "prettier": "^3.2.5"
+  }
+}
