@@ -19,7 +19,7 @@ Guía paso a paso para hacer deploy completo de Groceriando en la nube usando Gi
 ### 1.1 Crear Repositorio en GitHub
 
 1. Ve a **https://github.com/new**
-2. **Repository name**: `groceriando`
+2. **Repository name**: `groceriandoPR` (o el nombre que prefieras)
 3. **Description**: "Lista de compras inteligente para supermercados de Puerto Rico"
 4. **Visibility**: 
    - ✅ **Public** (recomendado para portfolio)
@@ -40,8 +40,8 @@ git branch
 # Si estás en master, cambia a main:
 git branch -M main
 
-# Configurar remote (reemplaza TU_USUARIO con tu username)
-git remote set-url origin https://github.com/TU_USUARIO/groceriando.git
+# Configurar remote (ya configurado para groceriandoPR)
+git remote set-url origin https://github.com/lologaby/groceriandoPR.git
 
 # Verificar remote
 git remote -v
